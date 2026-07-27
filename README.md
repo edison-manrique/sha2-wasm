@@ -16,20 +16,20 @@ Soporta **SHA-256**, **SHA-512**, **HMAC-SHA256** y **HMAC-SHA512** con rendimie
   - Correctitud **validada contra `node:crypto`**.
   - Detección de colisiones del _ring buffer_ en `reset()` — nunca produce un hash corrupto en silencio.
 - 🔄 **Streaming Real**: Hashing de archivos de cualquier tamaño con `file.stream()` y callback de progreso — memoria plana, sin acumular buffers.
-- 📦 **Binario Compacto**: ~14 KB de WebAssembly optimizado.
+- 📦 **Binario Compacto**: ~12 KB de WebAssembly optimizado.
 
 ---
 
 ## 📦 Instalación
 
 ```bash
-npm install sha2-wasm
+npm install @edison-manrique/sha2-wasm
 ```
 
 O con Bun / Yarn / pnpm:
 
 ```bash
-bun add sha2-wasm
+bun add @edison-manrique/sha2-wasm
 ```
 
 ---
@@ -39,14 +39,14 @@ bun add sha2-wasm
 ### 1. Inicializar la biblioteca
 
 ```ts
-import { Sha2Wasm, Sha256, Sha512 } from "sha2-wasm"
+import { Sha2Wasm, Sha256, Sha512 } from "@edison-manrique/sha2-wasm"
 
 // Carga automática desde la URL por defecto (navegador / bundler)
 await Sha2Wasm.load()
 
 // O cargando desde un buffer binario explícito (útil para Node.js / Bun):
 // import { readFileSync } from "node:fs"
-// const wasmBuffer = readFileSync("node_modules/sha2-wasm/dist/sha2.wasm")
+// const wasmBuffer = readFileSync("node_modules/@edison-manrique/sha2-wasm/dist/sha2.wasm")
 // await Sha2Wasm.fromBuffer(wasmBuffer)
 ```
 
