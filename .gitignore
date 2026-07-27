@@ -1,0 +1,16 @@
+# Dependencias — heredadas del workspace raíz
+node_modules/
+
+# Salida de compilación TypeScript
+dist/
+
+# Archivos de debug y test temporales
+build/
+
+# Editor
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

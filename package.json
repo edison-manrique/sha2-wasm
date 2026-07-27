@@ -1,0 +1,54 @@
+{
+  "name": "sha2-wasm",
+  "version": "1.0.0",
+  "description": "Implementación de alto rendimiento de SHA-2 (SHA-256 / SHA-512 / HMAC) en AssemblyScript / WebAssembly con un envoltorio modular en TypeScript sin asignación de memoria (zero-allocation).",
+  "author": "Edison Manrique",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "asbuild": "asc assembly/index.ts --target release",
+    "asbuild:debug": "asc assembly/index.ts --target debug",
+    "build:ts": "esbuild src/index.ts --bundle --format=esm --minify --platform=browser --outfile=dist/index.js && tsc --emitDeclarationOnly",
+    "build": "bun run asbuild && bun run build:ts",
+    "prepublishOnly": "bun run build",
+    "test": "bun test test/index.test.ts",
+    "test:stress": "bun test test/stress.test.ts",
+    "examples": "bun examples/server.ts"
+  },
+  "keywords": [
+    "wasm",
+    "webassembly",
+    "sha2",
+    "sha256",
+    "sha512",
+    "hmac",
+    "hmac-sha256",
+    "hmac-sha512",
+    "assemblyscript",
+    "crypto"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/edison-manrique/sha2-wasm.git"
+  },
+  "bugs": {
+    "url": "https://github.com/edison-manrique/sha2-wasm/issues"
+  },
+  "homepage": "https://github.com/edison-manrique/sha2-wasm#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

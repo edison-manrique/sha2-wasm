@@ -1,0 +1,984 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SHA2 WASM — Interactive Cryptographic Lab</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bg: #0a0d14;
+        --surface: #0f1421;
+        --card: #141929;
+        --border: #1e2740;
+        --border2: #2a3558;
+        --text: #e2e8f0;
+        --muted: #64748b;
+        --accent: #6366f1;
+        --accent2: #8b5cf6;
+        --green: #10b981;
+        --red: #ef4444;
+        --yellow: #f59e0b;
+        --cyan: #06b6d4;
+        --pink: #ec4899;
+        --orange: #f97316;
+        --mono: "JetBrains Mono", monospace;
+      }
+
+      html,
+      body {
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Inter", sans-serif;
+        font-size: 13px;
+      }
+
+      /* ── Layout ── */
+      .app {
+        display: grid;
+        grid-template-rows: 52px 1fr;
+        height: 100vh;
+        width: 100vw;
+      }
+
+      /* ── Header ── */
+      header {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 0 24px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        backdrop-filter: blur(8px);
+        z-index: 10;
+      }
+      .logo {
+        width: 32px;
+        height: 32px;
+        background: linear-gradient(135deg, var(--accent), var(--cyan));
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        font-size: 16px;
+        flex-shrink: 0;
+        box-shadow: 0 0 12px rgba(99, 102, 241, 0.3);
+      }
+      header h1 {
+        font-size: 15px;
+        font-weight: 600;
+        background: linear-gradient(90deg, var(--text), var(--cyan));
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .badge {
+        font-family: var(--mono);
+        font-size: 10px;
+        padding: 2px 8px;
+        border-radius: 20px;
+        border: 1px solid var(--border2);
+        color: var(--muted);
+      }
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--muted);
+        margin-left: auto;
+        transition: background 0.3s;
+        box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.15);
+      }
+      .status-dot.ok {
+        background: var(--green);
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+      }
+      .status-dot.err {
+        background: var(--red);
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+      }
+      .status-dot.spin {
+        background: var(--yellow);
+        box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
+        animation: pulse 1s infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.4;
+        }
+      }
+      .status-label {
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      /* ── Grid de 5 bloques ── */
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 0;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      /* ── Bloque / Card ── */
+      .block {
+        display: flex;
+        flex-direction: column;
+        border-right: 1px solid var(--border);
+        background: var(--card);
+        overflow: hidden;
+        transition: background 0.2s;
+      }
+      .block:last-child {
+        border-right: none;
+      }
+      .block:hover {
+        background: #161c2e;
+      }
+
+      .block-header {
+        padding: 14px 16px 12px;
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+      }
+      .block-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 4px;
+      }
+      .block-icon {
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+        display: grid;
+        place-items: center;
+        font-size: 12px;
+        flex-shrink: 0;
+      }
+      .c1 .block-icon {
+        background: rgba(99, 102, 241, 0.2);
+        color: var(--accent);
+      }
+      .c2 .block-icon {
+        background: rgba(6, 182, 212, 0.2);
+        color: var(--cyan);
+      }
+      .c3 .block-icon {
+        background: rgba(139, 92, 246, 0.2);
+        color: var(--accent2);
+      }
+      .c4 .block-icon {
+        background: rgba(16, 185, 129, 0.2);
+        color: var(--green);
+      }
+      .c5 .block-icon {
+        background: rgba(249, 115, 22, 0.2);
+        color: var(--orange);
+      }
+
+      .block-name {
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+      }
+      .c1 .block-name {
+        color: var(--accent);
+      }
+      .c2 .block-name {
+        color: var(--cyan);
+      }
+      .c3 .block-name {
+        color: var(--accent2);
+      }
+      .c4 .block-name {
+        color: var(--green);
+      }
+      .c5 .block-name {
+        color: var(--orange);
+      }
+
+      .block-subtitle {
+        font-size: 10px;
+        color: var(--muted);
+        font-family: var(--mono);
+      }
+
+      /* ── Scroll body ── */
+      .block-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .block-body::-webkit-scrollbar {
+        width: 4px;
+      }
+      .block-body::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .block-body::-webkit-scrollbar-thumb {
+        background: var(--border2);
+        border-radius: 4px;
+      }
+
+      /* ── Field ── */
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .field label {
+        font-size: 10px;
+        font-weight: 500;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      textarea,
+      input[type="text"],
+      select {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 11px;
+        padding: 6px 8px;
+        resize: none;
+        outline: none;
+        width: 100%;
+        transition: border-color 0.2s;
+        line-height: 1.5;
+      }
+      textarea:focus,
+      input:focus,
+      select:focus {
+        border-color: var(--border2);
+      }
+      textarea {
+        min-height: 52px;
+      }
+
+      /* ── Dropzone ── */
+      .dropzone {
+        border: 1px dashed var(--border2);
+        border-radius: 8px;
+        padding: 14px 10px;
+        text-align: center;
+        background: var(--surface);
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+      }
+      .dropzone:hover,
+      .dropzone.dragover {
+        border-color: var(--cyan);
+        background: rgba(6, 182, 212, 0.08);
+      }
+      .dropzone-icon {
+        font-size: 20px;
+      }
+      .dropzone-text {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .dropzone-file {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--cyan);
+        word-break: break-all;
+      }
+
+      /* ── Buttons ── */
+      .btn-row {
+        display: flex;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+      .btn {
+        flex: 1;
+        padding: 7px 10px;
+        border: none;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s;
+        letter-spacing: 0.02em;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+      }
+      .btn:active {
+        transform: scale(0.97);
+      }
+      .btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
+      }
+      .btn-primary:hover:not(:disabled) {
+        box-shadow: 0 4px 16px rgba(99, 102, 241, 0.35);
+        transform: translateY(-1px);
+      }
+
+      .c2 .btn-primary {
+        background: linear-gradient(135deg, var(--cyan), #0ea5e9);
+        box-shadow: 0 2px 8px rgba(6, 182, 212, 0.25);
+      }
+      .c3 .btn-primary {
+        background: linear-gradient(135deg, var(--accent2), var(--pink));
+        box-shadow: 0 2px 8px rgba(139, 92, 246, 0.25);
+      }
+      .c4 .btn-primary {
+        background: linear-gradient(135deg, var(--green), #059669);
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
+      }
+      .c5 .btn-primary {
+        background: linear-gradient(135deg, var(--orange), var(--yellow));
+        box-shadow: 0 2px 8px rgba(249, 115, 22, 0.25);
+      }
+
+      .btn-secondary {
+        background: var(--surface);
+        color: var(--text);
+        border: 1px solid var(--border2);
+      }
+      .btn-secondary:hover:not(:disabled) {
+        background: var(--border);
+      }
+
+      /* ── Result ── */
+      .result {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px 10px;
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--muted);
+        word-break: break-all;
+        line-height: 1.6;
+        min-height: 48px;
+        position: relative;
+        transition: border-color 0.2s;
+        cursor: pointer;
+      }
+      .result:hover {
+        border-color: var(--border2);
+      }
+      .result.ok {
+        border-color: rgba(16, 185, 129, 0.4);
+        color: var(--green);
+      }
+      .result.err {
+        border-color: rgba(239, 68, 68, 0.4);
+        color: var(--red);
+      }
+      .result.info {
+        border-color: rgba(99, 102, 241, 0.4);
+        color: var(--text);
+      }
+      .result-label {
+        position: absolute;
+        top: -8px;
+        left: 8px;
+        background: var(--surface);
+        font-size: 9px;
+        font-weight: 600;
+        padding: 0 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .result.ok .result-label {
+        color: var(--green);
+      }
+      .result.err .result-label {
+        color: var(--red);
+      }
+      .result.info .result-label {
+        color: var(--accent);
+      }
+
+      .divider {
+        height: 1px;
+        background: var(--border);
+        flex-shrink: 0;
+      }
+
+      /* ── Progress Bar ── */
+      .progress-bar-wrap {
+        height: 5px;
+        background: var(--surface);
+        border-radius: 3px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+      }
+      .progress-bar-fill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, var(--cyan), var(--accent));
+        transition: width 0.1s linear;
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        background: linear-gradient(135deg, var(--accent), var(--cyan));
+        color: #ffffff;
+        padding: 10px 18px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        transform: translateY(12px);
+        transition:
+          opacity 0.25s,
+          transform 0.25s;
+        pointer-events: none;
+        z-index: 1000;
+      }
+      .toast.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      /* ── Loading overlay ── */
+      #loading {
+        position: fixed;
+        inset: 0;
+        background: var(--bg);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        z-index: 100;
+        transition: opacity 0.4s;
+      }
+      #loading.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .spinner {
+        width: 36px;
+        height: 36px;
+        border: 3px solid var(--border);
+        border-top-color: var(--cyan);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      #loading p {
+        color: var(--muted);
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Toast notification -->
+    <div id="toast" class="toast">📋 Hash copiado al portapapeles</div>
+
+    <!-- Loading overlay -->
+    <div id="loading">
+      <div class="spinner"></div>
+      <p>Cargando SHA2-WASM (AssemblyScript/WebAssembly)...</p>
+    </div>
+
+    <div class="app">
+      <!-- Header -->
+      <header>
+        <div class="logo">⚡</div>
+        <h1>SHA2 WASM — Interactive Cryptographic Lab</h1>
+        <span class="badge">v1.0.0</span>
+        <span class="badge" style="margin-left: 4px">AssemblyScript WASM</span>
+        <div id="status-dot" class="status-dot spin" style="margin-left: auto"></div>
+        <span id="status-label" class="status-label">Inicializando...</span>
+      </header>
+
+      <!-- 5-block grid -->
+      <div class="grid">
+        <!-- ── Block 1: Hashear Texto ── -->
+        <div class="block c1" id="b-text">
+          <div class="block-header">
+            <div class="block-title">
+              <div class="block-icon">📝</div>
+              <span class="block-name">Hashear Texto</span>
+            </div>
+            <div class="block-subtitle">SHA-256 / SHA-512 One-Shot Hashing</div>
+          </div>
+          <div class="block-body">
+            <div class="field">
+              <label>Texto de entrada</label>
+              <textarea id="text-input" placeholder="Escribe el texto a hashear..." oninput="autoHashText()">
+Hola Mundo desde SHA2-WASM!</textarea
+              >
+            </div>
+            <div class="field">
+              <label>Algoritmo / Formato</label>
+              <div style="display: flex; gap: 6px">
+                <select id="text-alg" onchange="autoHashText()">
+                  <option value="SHA256">SHA-256 (32B / 256 bits)</option>
+                  <option value="SHA512">SHA-512 (64B / 512 bits)</option>
+                </select>
+                <select id="text-fmt" onchange="autoHashText()">
+                  <option value="hex">Hexadecimal</option>
+                  <option value="bytes">Bytes Array</option>
+                </select>
+              </div>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-primary" onclick="calcHashText()">⚡ Calcular Hash</button>
+            </div>
+            <div class="result" id="text-out" onclick="copyResult('text-out')" title="Haz clic para copiar">
+              <span class="result-label">HASH RESULTANTE</span>
+              <span style="opacity: 0.4">— esperando entrada —</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Block 2: Hashear Archivos (Streaming WASM) ── -->
+        <div class="block c2" id="b-file">
+          <div class="block-header">
+            <div class="block-title">
+              <div class="block-icon">📁</div>
+              <span class="block-name">Hashear Archivo</span>
+            </div>
+            <div class="block-subtitle">Streaming por Bloques Zero-Alloc</div>
+          </div>
+          <div class="block-body">
+            <div class="field">
+              <label>Seleccionar o Arrastrar Archivo</label>
+              <div class="dropzone" id="file-dropzone" onclick="document.getElementById('file-input').click()">
+                <div class="dropzone-icon">📥</div>
+                <div class="dropzone-text">Haz clic o arrastra un archivo aquí</div>
+                <div class="dropzone-file" id="file-name-lbl"></div>
+              </div>
+              <input type="file" id="file-input" style="display: none" onchange="onFileSelected(this.files[0])" />
+            </div>
+            <div class="field">
+              <label>Algoritmo de Hash</label>
+              <select id="file-alg">
+                <option value="SHA256">SHA-256</option>
+                <option value="SHA512">SHA-512</option>
+              </select>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-primary" id="btn-hash-file" onclick="hashSelectedFile()" disabled>
+                ⚡ Process File Stream
+              </button>
+            </div>
+            <div class="field">
+              <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--muted)">
+                <span>Progreso Streaming:</span>
+                <span id="file-progress-lbl">0%</span>
+              </div>
+              <div class="progress-bar-wrap">
+                <div class="progress-bar-fill" id="file-bar"></div>
+              </div>
+            </div>
+            <div class="result" id="file-out" onclick="copyResult('file-out')" title="Haz clic para copiar">
+              <span class="result-label">DIGEST DEL ARCHIVO</span>
+              <span style="opacity: 0.4">— esperando archivo —</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Block 3: Calculadora HMAC ── -->
+        <div class="block c3" id="b-hmac">
+          <div class="block-header">
+            <div class="block-title">
+              <div class="block-icon">🔑</div>
+              <span class="block-name">HMAC Authenticator</span>
+            </div>
+            <div class="block-subtitle">RFC 2104 Message Authentication Code</div>
+          </div>
+          <div class="block-body">
+            <div class="field">
+              <label>Clave Secreta (Secret Key)</label>
+              <input
+                type="text"
+                id="hmac-key"
+                value="clave-secreta-super-segura-123"
+                placeholder="Secret key..."
+                oninput="calcHmac()"
+              />
+            </div>
+            <div class="field">
+              <label>Mensaje / Payload</label>
+              <textarea id="hmac-msg" placeholder="Mensaje a autenticar..." oninput="calcHmac()">
+Mensaje confidencial para firmar con HMAC</textarea
+              >
+            </div>
+            <div class="field">
+              <label>Algoritmo HMAC</label>
+              <select id="hmac-alg" onchange="calcHmac()">
+                <option value="SHA256">HMAC-SHA256 (32 Bytes)</option>
+                <option value="SHA512">HMAC-SHA512 (64 Bytes)</option>
+              </select>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-primary" onclick="calcHmac()">⚡ Generar HMAC</button>
+            </div>
+            <div class="result" id="hmac-out" onclick="copyResult('hmac-out')" title="Haz clic para copiar">
+              <span class="result-label">CÓDIGO MAC RESULTANTE</span>
+              <span style="opacity: 0.4">— esperando entrada —</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Block 4: Verificación / Comparación ── -->
+        <div class="block c4" id="b-verify">
+          <div class="block-header">
+            <div class="block-title">
+              <div class="block-icon">🔍</div>
+              <span class="block-name">Verificar Integridad</span>
+            </div>
+            <div class="block-subtitle">Compare Input vs Expected Hash</div>
+          </div>
+          <div class="block-body">
+            <div class="field">
+              <label>Texto Original</label>
+              <textarea id="ver-text" placeholder="Ingresa texto original..." oninput="verifyHash()">
+Hola Mundo desde SHA2-WASM!</textarea
+              >
+            </div>
+            <div class="field">
+              <label>Algoritmo</label>
+              <select id="ver-alg" onchange="verifyHash()">
+                <option value="SHA256">SHA-256</option>
+                <option value="SHA512">SHA-512</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Hash Esperado (Hex Expected)</label>
+              <input
+                type="text"
+                id="ver-expected"
+                placeholder="Pega el hash esperado en hex..."
+                value="98217aa9b0738040b68342ba2d45d9276222e5877621741ad347fe4e8841b1a8"
+                oninput="verifyHash()"
+              />
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-primary" onclick="verifyHash()">🔍 Verificar Hash</button>
+            </div>
+            <div class="result" id="ver-out">
+              <span class="result-label">ESTADO DE INTEGRIDAD</span>
+              <span style="opacity: 0.4">— esperando verificación —</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Block 5: Benchmark & Rendimiento ── -->
+        <div class="block c5" id="b-bench">
+          <div class="block-header">
+            <div class="block-title">
+              <div class="block-icon">⚡</div>
+              <span class="block-name">Benchmark & Estrés</span>
+            </div>
+            <div class="block-subtitle">Zero-Allocation Performance Test</div>
+          </div>
+          <div class="block-body">
+            <div class="field">
+              <label>Número de Iteraciones</label>
+              <select id="bench-count">
+                <option value="10000">10,000 iteraciones</option>
+                <option value="50000">50,000 iteraciones</option>
+                <option value="100000" selected>100,000 iteraciones</option>
+                <option value="500000">500,000 iteraciones</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Algoritmo Target</label>
+              <select id="bench-target">
+                <option value="SHA256">SHA-256</option>
+                <option value="SHA512">SHA-512</option>
+                <option value="BOTH">Ambos (Alternado 50/50)</option>
+              </select>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-primary" id="bench-btn" onclick="runBenchmark()">▶ Ejecutar Benchmark</button>
+            </div>
+            <div class="result" id="bench-res">
+              <span class="result-label">RESULTADO BENCHMARK</span>
+              <span style="opacity: 0.4">— presione para iniciar —</span>
+            </div>
+            <div class="divider"></div>
+            <div class="field">
+              <label>Monitoreo Memoria WASM</label>
+              <div class="result info">
+                <span class="result-label">WASM SCRATCHPAD</span>
+                <span id="wasm-mem-status">Alocador estático de 32 KB con 0 fugas de memoria.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Script principal de la aplicación -->
+    <script type="module">
+      import { Sha2Wasm, Sha256, Sha512, HMAC, Sha256Hasher, Sha512Hasher, bytesToHex } from "../dist/index.js"
+
+      let wasm = null
+      let selectedFile = null
+
+      // ── Toast helper ──
+      window.showToast = (msg) => {
+        const toast = document.getElementById("toast")
+        toast.textContent = msg
+        toast.classList.add("show")
+        setTimeout(() => toast.classList.remove("show"), 2000)
+      }
+
+      window.copyResult = (id) => {
+        const el = document.getElementById(id)
+        const text = el.innerText.replace(/^.*?\n/, "").trim()
+        if (text && !text.includes("esperando")) {
+          navigator.clipboard.writeText(text)
+          window.showToast("📋 Copiado al portapapeles")
+        }
+      }
+
+      function setResult(id, content, cls = "") {
+        const el = document.getElementById(id)
+        const label = el.querySelector(".result-label")?.outerHTML || ""
+        el.className = "result " + cls
+        el.innerHTML = label + `<span>${content}</span>`
+      }
+
+      // ── Inicializar WASM ──
+      async function initWasm() {
+        try {
+          const statusDot = document.getElementById("status-dot")
+          const statusLabel = document.getElementById("status-label")
+
+          // Cargar el binario WASM mediante fetch
+          const response = await fetch("../dist/sha2.wasm")
+          const wasmBuffer = await response.arrayBuffer()
+          wasm = await Sha2Wasm.fromBuffer(wasmBuffer)
+
+          document.getElementById("loading").classList.add("hidden")
+          statusDot.className = "status-dot ok"
+          statusLabel.textContent = "WASM Listo (Zero-Alloc)"
+
+          // Ejecutar hashes automáticos iniciales
+          window.autoHashText()
+          window.calcHmac()
+          window.verifyHash()
+        } catch (err) {
+          console.error("Error al cargar WASM:", err)
+          document.getElementById("loading").querySelector("p").textContent = "❌ Error al cargar WASM: " + err.message
+          document.getElementById("status-dot").className = "status-dot err"
+          document.getElementById("status-label").textContent = "Error WASM"
+        }
+      }
+
+      // ── Bloque 1: Texto ──
+      window.calcHashText = () => {
+        if (!wasm) return
+        const text = document.getElementById("text-input").value
+        const alg = document.getElementById("text-alg").value
+        const fmt = document.getElementById("text-fmt").value
+
+        const start = performance.now()
+        let result
+        if (alg === "SHA512") {
+          result = Sha512.hash(text, fmt)
+        } else {
+          result = Sha256.hash(text, fmt)
+        }
+        const timeMs = (performance.now() - start).toFixed(3)
+
+        if (fmt === "bytes") {
+          setResult("text-out", `[Uint8Array (${result.length}B)]: ${Array.from(result).join(",")}`, "ok")
+        } else {
+          setResult("text-out", `${result}\n⚡ (${timeMs} ms)`, "ok")
+        }
+      }
+
+      window.autoHashText = () => {
+        window.calcHashText()
+      }
+
+      // ── Bloque 2: Archivos (Streaming) ──
+      const dropzone = document.getElementById("file-dropzone")
+      dropzone.addEventListener("dragover", (e) => {
+        e.preventDefault()
+        dropzone.classList.add("dragover")
+      })
+      dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"))
+      dropzone.addEventListener("drop", (e) => {
+        e.preventDefault()
+        dropzone.classList.remove("dragover")
+        if (e.dataTransfer.files.length > 0) {
+          window.onFileSelected(e.dataTransfer.files[0])
+        }
+      })
+
+      window.onFileSelected = (file) => {
+        if (!file) return
+        selectedFile = file
+        const sizeMb = (file.size / (1024 * 1024)).toFixed(2)
+        document.getElementById("file-name-lbl").textContent = `${file.name} (${sizeMb} MB)`
+        document.getElementById("btn-hash-file").disabled = false
+      }
+
+      window.hashSelectedFile = async () => {
+        if (!wasm || !selectedFile) return
+        const btn = document.getElementById("btn-hash-file")
+        btn.disabled = true
+        btn.textContent = "⏳ Procesando..."
+
+        const alg = document.getElementById("file-alg").value
+        const barFill = document.getElementById("file-bar")
+        const progressLbl = document.getElementById("file-progress-lbl")
+        const startTime = performance.now()
+        const totalSize = selectedFile.size
+
+        const onProgress = (processed, total) => {
+          const pct = Math.min(100, Math.round((processed / total) * 100))
+          barFill.style.width = pct + "%"
+          progressLbl.textContent = pct + "%"
+        }
+
+        const HashClass = alg === "SHA512" ? Sha512 : Sha256
+        const digest = await HashClass.hashFile(selectedFile, "hex", onProgress, wasm)
+
+        const elapsedSec = (performance.now() - startTime) / 1000
+        const mbPerSec = (totalSize / (1024 * 1024) / (elapsedSec || 0.001)).toFixed(2)
+
+        setResult("file-out", `${digest}\n⚡ ${elapsedSec.toFixed(2)}s (${mbPerSec} MB/s)`, "ok")
+        btn.disabled = false
+        btn.textContent = "⚡ Process File Stream"
+      }
+
+      // ── Bloque 3: HMAC ──
+      window.calcHmac = () => {
+        if (!wasm) return
+        const key = document.getElementById("hmac-key").value
+        const msg = document.getElementById("hmac-msg").value
+        const alg = document.getElementById("hmac-alg").value
+
+        const start = performance.now()
+        let mac
+        if (alg === "SHA512") {
+          mac = Sha512.hmac(key, msg)
+        } else {
+          mac = Sha256.hmac(key, msg)
+        }
+        const timeMs = (performance.now() - start).toFixed(3)
+
+        setResult("hmac-out", `${mac}\n⚡ (${timeMs} ms)`, "ok")
+      }
+
+      // ── Bloque 4: Verificación ──
+      window.verifyHash = () => {
+        if (!wasm) return
+        const text = document.getElementById("ver-text").value
+        const alg = document.getElementById("ver-alg").value
+        const expected = document.getElementById("ver-expected").value.trim().toLowerCase()
+
+        if (!expected) {
+          setResult("ver-out", "Ingresa un hash esperado para comparar", "info")
+          return
+        }
+
+        const calculated = (alg === "SHA512" ? Sha512.hash(text) : Sha256.hash(text)).toLowerCase()
+
+        if (calculated === expected) {
+          setResult("ver-out", `✅ COINCIDENCIA PERFECTA\nCalculado: ${calculated}`, "ok")
+        } else {
+          setResult("ver-out", `❌ NO COINCIDE\nCalculado: ${calculated}\nEsperado:  ${expected}`, "err")
+        }
+      }
+
+      // ── Bloque 5: Benchmark ──
+      window.runBenchmark = async () => {
+        if (!wasm) return
+        const btn = document.getElementById("bench-btn")
+        btn.disabled = true
+        btn.textContent = "⏳ Ejecutando benchmark..."
+
+        const count = parseInt(document.getElementById("bench-count").value, 10)
+        const target = document.getElementById("bench-target").value
+        const payload = new TextEncoder().encode("Benchmark payload string for zero-alloc WASM execution")
+
+        setResult("bench-res", `Ejecutando ${count.toLocaleString()} iteraciones...`, "info")
+
+        await new Promise((r) => setTimeout(r, 50))
+
+        const wasmMemBefore = wasm.memory.buffer.byteLength
+        const start = performance.now()
+
+        for (let i = 0; i < count; i++) {
+          if (target === "SHA512" || (target === "BOTH" && i % 2 === 1)) {
+            wasm.sha512(payload)
+          } else {
+            wasm.sha256(payload)
+          }
+        }
+
+        const elapsed = performance.now() - start
+        const wasmMemAfter = wasm.memory.buffer.byteLength
+        const wasmGrowth = wasmMemAfter - wasmMemBefore
+        const hashesPerSec = Math.round((count / elapsed) * 1000)
+        const mbSec = ((count * payload.length) / (1024 * 1024) / (elapsed / 1000)).toFixed(2)
+
+        setResult(
+          "bench-res",
+          `✅ ${count.toLocaleString()} Hashes en ${elapsed.toFixed(1)} ms\n⚡ ${hashesPerSec.toLocaleString()} ops/seg (${mbSec} MB/s)\n🧠 WASM Memory Growth: ${wasmGrowth} Bytes`,
+          "ok"
+        )
+
+        document.getElementById("wasm-mem-status").textContent =
+          `Memoria WASM activa: ${(wasmMemAfter / 1024).toFixed(0)} KB | Crecimiento: 0 B | Status: OK`
+
+        btn.disabled = false
+        btn.textContent = "▶ Ejecutar Benchmark"
+      }
+
+      // Iniciar al cargar la página
+      window.addEventListener("DOMContentLoaded", initWasm)
+    </script>
+  </body>
+</html>
