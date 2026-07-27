@@ -16,7 +16,7 @@
  * - hashFile() con archivo vacío → hash estándar de input vacío (fail-fast).
  */
 
-import { OutputFormat, bytesToHex } from "./types.js"
+import { OutputFormat, bytesToHex, hexToBytes } from "./types.js"
 import { Sha2Wasm } from "./sha2-wasm.js"
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -173,6 +173,18 @@ export class Sha512 {
     const bytes = wasm.sha512Hmac(key, data)
     if (format === "bytes") return bytes
     return bytesToHex(bytes)
+  }
+
+  /** Verifica un HMAC-SHA512 en tiempo constante. */
+  static hmacVerify(
+    key: Uint8Array | string,
+    data: Uint8Array | string,
+    mac: Uint8Array | string,
+    wasmInstance?: Sha2Wasm
+  ): boolean {
+    const wasm = wasmInstance || Sha2Wasm.getInstance()
+    const macBytes = typeof mac === "string" ? hexToBytes(mac) : mac
+    return wasm.sha512HmacVerify(key, data, macBytes)
   }
 
   /**

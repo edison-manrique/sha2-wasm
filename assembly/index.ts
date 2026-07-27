@@ -47,6 +47,29 @@ export function sha256_hmac_raw(outPtr: usize, kPtr: usize, kLen: isize, mPtr: u
   Sha256.hmac_raw(outPtr, kPtr, kLen, mPtr, mLen)
 }
 
+/**
+ * Verifica un HMAC-SHA256 en tiempo constante.
+ * Compara el HMAC calculado con macPtr[0..macLen) y retorna true si coinciden,
+ * false en caso contrario. Tiempo constante (sin early-exit).
+ *
+ * @param kPtr   Puntero a la clave HMAC.
+ * @param kLen   Longitud de la clave en bytes.
+ * @param mPtr   Puntero al mensaje a autenticar.
+ * @param mLen   Longitud del mensaje en bytes.
+ * @param macPtr Puntero al MAC esperado.
+ * @param macLen Longitud del MAC esperado (debe ser 32).
+ */
+export function sha256_hmac_verify_raw(
+  kPtr: usize,
+  kLen: isize,
+  mPtr: usize,
+  mLen: isize,
+  macPtr: usize,
+  macLen: isize
+): bool {
+  return Sha256.hmac_verify_raw(kPtr, kLen, mPtr, mLen, macPtr, macLen)
+}
+
 // ── Hash One-Shot SHA-512 ──────────────────────────────────────────────────
 
 /**
@@ -73,6 +96,29 @@ export function sha512_hash_raw(outPtr: usize, mPtr: usize, n: isize): void {
  */
 export function sha512_hmac_raw(outPtr: usize, kPtr: usize, kLen: isize, mPtr: usize, mLen: isize): void {
   Sha512.hmac_raw(outPtr, kPtr, kLen, mPtr, mLen)
+}
+
+/**
+ * Verifica un HMAC-SHA512 en tiempo constante (constant-time).
+ * Compara el HMAC calculado con macPtr[0..macLen) y retorna true si coinciden,
+ * false en caso contrario. Tiempo constante (sin early-exit).
+ *
+ * @param kPtr   Puntero a la clave HMAC.
+ * @param kLen   Longitud de la clave en bytes.
+ * @param mPtr   Puntero al mensaje a autenticar.
+ * @param mLen   Longitud del mensaje en bytes.
+ * @param macPtr Puntero al MAC esperado.
+ * @param macLen Longitud del MAC esperado (debe ser 64).
+ */
+export function sha512_hmac_verify_raw(
+  kPtr: usize,
+  kLen: isize,
+  mPtr: usize,
+  mLen: isize,
+  macPtr: usize,
+  macLen: isize
+): bool {
+  return Sha512.hmac_verify_raw(kPtr, kLen, mPtr, mLen, macPtr, macLen)
 }
 
 // ── Contexto Streaming SHA-256 ─────────────────────────────────────────────

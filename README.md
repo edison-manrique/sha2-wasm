@@ -2,18 +2,19 @@
 
 Biblioteca criptográfica de hashing ultra-rápida y de alto rendimiento compilada en WebAssembly (WASM) utilizando AssemblyScript y empaquetada con un wrapper TypeScript Zero-Allocation.
 
-Soporta **SHA-256**, **SHA-512**, **HMAC-SHA256** y **HMAC-SHA512** con rendimiento extremo (**> 212 MB/s** en streaming de archivos, **~2.2 M hashes/s** en hashes pequeños) y **0 % de presión sobre el Garbage Collector (GC)**.
+Soporta **SHA-256**, **SHA-512**, **HMAC-SHA256** y **HMAC-SHA512** —con **verificación de HMAC en tiempo constante** (a prueba de _timing attacks_)— con rendimiento extremo (**> 217 MB/s** en compute puro, **~2.2 M hashes/s** en hashes pequeños, **~158 K HMAC-verify/s**) y **0 % de presión sobre el Garbage Collector (GC)**.
 
 ---
 
 ## 🚀 Características Principales
 
-- ⚡ **Máximo Rendimiento**: Núcleo de compresión desplegado en WebAssembly con más de **212 MB/s** de throughput en streaming y **~2.2 millones de hashes por segundo** en mensajes pequeños.
+- ⚡ **Máximo Rendimiento**: Núcleo de compresión desplegado en WebAssembly con más de **217 MB/s** de throughput en compute puro y **~2.2 millones de hashes por segundo** en mensajes pequeños.
 - 🧹 **Zero-Alloc (Cero Alocaciones GC)**: Usa un asignador de memoria _scratchpad_ estático (`WasmAllocator`) reservado en tiempo de compilación — ninguna operación reserva memoria en el heap en runtime.
 - 🌐 **Multiplataforma**: Funciona sin modificaciones en Node.js, Bun, Deno y Navegadores Web (Vite, Webpack, etc.).
 - 🛡️ **Seguridad Crypto**:
   - Algoritmos estándar **SHA-256 / SHA-512** (FIPS 180-4) y **HMAC** (RFC 2104).
-  - Correctitud **validada contra `node:crypto`**.
+  - **Verificación HMAC en tiempo constante** (`hmacVerify`): comparación por XOR acumulativo sin _early-exit_, inmune a ataques de timing.
+  - Correctitud **validada contra `node:crypto`** (hash, HMAC y HMAC-verify, incluida la detección de alteración).
   - Detección de colisiones del _ring buffer_ en `reset()` — nunca produce un hash corrupto en silencio.
 - 🔄 **Streaming Real**: Hashing de archivos de cualquier tamaño con `file.stream()` y callback de progreso — memoria plana, sin acumular buffers.
 - 📦 **Binario Compacto**: ~12 KB de WebAssembly optimizado.
@@ -111,7 +112,34 @@ const token2 = hmac.digest("mensaje 2")
 const mac2 = HMAC.compute("SHA512", clave, mensaje, "bytes") // Uint8Array(64)
 ```
 
-### 5. Streaming (Hash Incremental)
+### 5. Verificación de HMAC (Constant-Time)
+
+Verifica un MAC **en tiempo constante** — la comparación recorre siempre los 32/64 bytes con XOR acumulativo y sin _early-exit_, por lo que **no revela información por timing** (esencial para no exponer la validación a ataques de canal lateral).
+
+```ts
+import { Sha256, HMAC, hexToBytes } from "@edison-manrique/sha2-wasm"
+
+const clave = "mi-clave-secreta"
+const mensaje = "mensaje a autenticar"
+
+// 🔏 Genera el MAC
+const mac = Sha256.hmac(clave, mensaje) // string hex
+
+// ✅ Verifica (acepta el MAC como hex o como bytes)
+const valido = Sha256.hmacVerify(clave, mensaje, mac) // true
+const validoBytes = Sha256.hmacVerify(clave, mensaje, hexToBytes(mac)) // true
+
+// ❌ Un MAC alterado o incorrecto → false (sin filtrar cuántos bytes coincidían)
+const falso = Sha256.hmacVerify(clave, mensaje, "00".repeat(32)) // false
+
+// 🔄 Con la API orientada a objetos
+const hmac = new HMAC(clave, "SHA256")
+const ok = hmac.verify(mensaje, mac) // true
+```
+
+> Disponible también en `Sha512.hmacVerify(...)` (MAC de 64 bytes).
+
+### 6. Streaming (Hash Incremental)
 
 Para datos que llegan en fragmentos (chunks de red, trozos de archivo, streams). Procesa el hash **sin acumular todo en memoria**.
 
@@ -139,7 +167,7 @@ const otro = hasher.digestHex()
 
 > ⚠️ Llamar `update()` después de `digest()` lanza un `Error` explícito (no falla en silencio). Usa `reset()` para reutilizar la instancia.
 
-### 6. Hashing de Archivos (con Progreso)
+### 7. Hashing de Archivos (con Progreso)
 
 Hashea un `Blob` / `File` de **cualquier tamaño** con streaming real y memoria plana.
 
@@ -162,7 +190,7 @@ console.log("SHA-256 del archivo:", hash)
 - **Memoria plana**: usa `file.stream()` y procesa chunk a chunk; no acumula buffers grandes en JS.
 - **Solapamiento I/O ↔ compute**: el _read-ahead_ lo gestiona el runtime (navegador / Bun).
 
-### 7. Formatos de Salida y Utilidades
+### 8. Formatos de Salida y Utilidades
 
 Todos los métodos aceptan el formato de salida (`"hex"` por defecto o `"bytes"`):
 
@@ -186,23 +214,27 @@ const buf = toUint8Array("texto") // string → Uint8Array (UTF-8)
 
 ## 📊 Benchmarks de Rendimiento
 
-Pruebas ejecutadas en Bun (JavaScriptCore) sobre un procesador x86-64 moderno, en single-thread:
+Pruebas ejecutadas en Bun (JavaScriptCore) sobre un procesador x86-64 moderno, en single-thread (mediana de 5 muestras):
 
-| Algoritmo | Caso                   | Throughput    | Ops/seg           |
-| --------- | ---------------------- | ------------- | ----------------- |
-| SHA-256   | Archivo (streaming)    | **~200 MB/s** | —                 |
-| SHA-512   | Archivo (streaming)    | **~300 MB/s** | —                 |
-| SHA-256   | Hashes pequeños (55 B) | ~114 MB/s     | **~2.20 M ops/s** |
-| SHA-512   | Hashes pequeños (55 B) | ~95 MB/s      | **~1.85 M ops/s** |
-| SHA-256   | Compute puro (RAM)     | **~212 MB/s** | —                 |
-| SHA-512   | Compute puro (RAM)     | **~318 MB/s** | —                 |
+| Algoritmo | Caso                           | Throughput    | Ops/seg           |
+| --------- | ------------------------------ | ------------- | ----------------- |
+| SHA-256   | Compute puro (RAM, 500 MB)     | **217 MB/s**  | —                 |
+| SHA-512   | Compute puro (RAM, 500 MB)     | **317 MB/s**  | —                 |
+| SHA-256   | HMAC throughput (RAM, 256 MB)  | **210 MB/s**  | —                 |
+| SHA-512   | HMAC throughput (RAM, 256 MB)  | **299 MB/s**  | —                 |
+| SHA-256   | HMAC verify (1 KB, const-time) | —             | **~158 K ops/s**  |
+| SHA-512   | HMAC verify (1 KB, const-time) | —             | **~183 K ops/s**  |
+| SHA-256   | Hashes pequeños (55 B)         | ~114 MB/s     | **~2.20 M ops/s** |
+| SHA-512   | Hashes pequeños (55 B)         | ~95 MB/s      | **~1.85 M ops/s** |
+| SHA-256   | Archivo (streaming)            | **~200 MB/s** | —                 |
+| SHA-512   | Archivo (streaming)            | **~300 MB/s** | —                 |
 
 **Comparativa (single-thread):**
 
-| Contra                                                 | Resultado            |
-| ------------------------------------------------------ | -------------------- |
-| [`hash-wasm`](https://www.npmjs.com/package/hash-wasm) | **+5 %** más rápido  |
-| C nativo (`gcc -O3 -march=native`)                     | **~68 %** del nativo |
+| Contra                                                 | Resultado                                                    |
+| ------------------------------------------------------ | ------------------------------------------------------------ |
+| [`hash-wasm`](https://www.npmjs.com/package/hash-wasm) | **+3–4 %** más rápido (SHA-256 **1.03×**, SHA-512 **1.04×**) |
+| C nativo (`gcc -O3 -march=native`)                     | **~68 %** del nativo                                         |
 
 > El ~68 % frente a C nativo es la banda alta esperada para WebAssembly (sin acceso a instrucciones específicas de CPU como `-march=native`). A cambio obtienes **portabilidad total**: el mismo binario de 12 KB corre en cualquier navegador, Bun o Node.
 
@@ -214,6 +246,7 @@ Pruebas ejecutadas en Bun (JavaScriptCore) sobre un procesador x86-64 moderno, e
 - **Punteros fijos**: los resultados se devuelven en propiedades primitivas (`lastPtr`, `lastLen`) en lugar de objetos intermedios.
 - **Única asignación**: el `Uint8Array` final que se entrega al usuario (inevitable para devolver el hash).
 - **Detección de colisiones**: los hashers verifican el IV del contexto en `reset()` y reasignan memoria si otra operación sobrescribió su región.
+- **Comparación constant-time**: `hmac_verify_raw` compara el MAC calculado con el esperado mediante XOR + OR acumulativo de longitud fija (32/64 iteraciones, sin branches dependientes de los datos), evitando fugas por timing.
 
 ---
 
@@ -230,7 +263,8 @@ bun run asbuild:debug    # debug → build/debug.wasm + .wat + sourcemap
 # Verificación de tipos
 bun run typecheck
 
-# Ejecutar el benchmark comparativo (vs hash-wasm) + validación de correctitud
+# Benchmark comparativo (vs hash-wasm) + validación de correctitud
+# (hash, HMAC y HMAC-verify contra node:crypto, incluida detección de alteración)
 bun run bench
 bun run bench ./ruta/al/archivo.mp4   # con archivo: + I/O puro + hashFile + diagnóstico
 
@@ -245,8 +279,8 @@ bun test test/
 ```
 sha2-wasm/
 ├── assembly/            # Núcleo en AssemblyScript (→ WebAssembly)
-│   ├── index.ts         # Exportaciones WASM (hash, hmac, ctx streaming)
-│   ├── sha256.ts        # SHA-256 (compress, update, final, hmac)
+│   ├── index.ts         # Exportaciones WASM (hash, hmac, hmac_verify, ctx streaming)
+│   ├── sha256.ts        # SHA-256 (compress, update, final, hmac, hmac_verify)
 │   ├── sha512.ts        # SHA-512
 │   ├── constants.ts     # Constantes K e IV
 │   ├── common.ts        # Helpers (bswap, Ch, Maj, Sigma, sigma)
@@ -257,10 +291,10 @@ sha2-wasm/
 │   ├── allocator.ts     # Alocador del scratchpad (zero-alloc)
 │   ├── sha256.ts        # Sha256 + Sha256Hasher
 │   ├── sha512.ts        # Sha512 + Sha512Hasher
-│   ├── hmac.ts          # Clase HMAC
+│   ├── hmac.ts          # Clase HMAC (digest + verify)
 │   └── types.ts         # Tipos, interfaces y utilidades
 ├── test/                # Benchmarks
-│   └── full.bench.ts    # Bench comparativo (vs hash-wasm)
+│   └── bench.ts         # Bench comparativo (vs hash-wasm) + HMAC + verify
 ├── dist/                # Build (generado)
 ├── asconfig.json        # Configuración de AssemblyScript
 ├── package.json

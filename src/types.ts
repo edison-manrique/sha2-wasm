@@ -60,6 +60,15 @@ export interface AsmExports {
   sha256_update_raw: (ctxPtr: number, mPtr: number, n: number) => void
   /** Finaliza SHA-256: padding + compresión → outPtr[0..32). */
   sha256_final_raw: (ctxPtr: number, paddedPtr: number, outPtr: number) => void
+  /** Verifica HMAC-SHA256 en tiempo constante. Retorna 1 (válido) o 0 (inválido). */
+  sha256_hmac_verify_raw: (
+    kPtr: number,
+    kLen: number,
+    mPtr: number,
+    mLen: number,
+    macPtr: number,
+    macLen: number
+  ) => number
 
   // ── FUNCIONES SHA-512 ──
 
@@ -73,6 +82,15 @@ export interface AsmExports {
   sha512_update_raw: (ctxPtr: number, mPtr: number, n: number) => void
   /** Finaliza SHA-512: padding + compresión → outPtr[0..64). */
   sha512_final_raw: (ctxPtr: number, paddedPtr: number, outPtr: number) => void
+  /** Verifica HMAC-SHA512 en tiempo constante. Retorna 1 (válido) o 0 (inválido). */
+  sha512_hmac_verify_raw: (
+    kPtr: number,
+    kLen: number,
+    mPtr: number,
+    mLen: number,
+    macPtr: number,
+    macLen: number
+  ) => number
 
   // ── ABI ASSEMBLYSCRIPT ──
 

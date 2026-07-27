@@ -1,6 +1,6 @@
 {
   "name": "@edison-manrique/sha2-wasm",
-  "version": "1.0.4",
+  "version": "1.1.0",
   "description": "Implementación de alto rendimiento de SHA-2 (SHA-256 / SHA-512 / HMAC) en AssemblyScript / WebAssembly con un envoltorio modular en TypeScript sin asignación de memoria (zero-allocation).",
   "author": "Edison Manrique",
   "license": "Apache-2.0",

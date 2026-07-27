@@ -338,11 +338,7 @@ export class Sha512 {
     Sha512.final(ctx, paddedPtr, outPtr)
   }
 
-  /**
-   * HMAC-SHA512 (100% Zero-Alloc)
-   * Escribe el resultado directamente en outPtr.
-   */
-  static hmac_raw(outPtr: usize, kPtr: usize, kLen: isize, mPtr: usize, mLen: isize): void {
+  private static hmac_compute(outPtr: usize, kPtr: usize, kLen: isize, mPtr: usize, mLen: isize): void {
     const scratchPtr = align8(CRYPTO_WORK_PTR)
     const k_buf = scratchPtr // 128 bytes
     const b = align8(k_buf + 128) // 128 bytes
@@ -361,7 +357,6 @@ export class Sha512 {
     for (let i = 0; i < 128; i++) {
       store<u8>(b + i, load<u8>(k_buf + i) ^ 0x36)
     }
-
     ctx.init()
     Sha512.update(ctx, b, 128)
     Sha512.update(ctx, mPtr, mLen)
@@ -371,10 +366,41 @@ export class Sha512 {
     for (let i = 0; i < 128; i++) {
       store<u8>(b + i, load<u8>(k_buf + i) ^ 0x5c)
     }
-
     ctx.init()
     Sha512.update(ctx, b, 128)
     Sha512.update(ctx, outPtr, 64)
     Sha512.final(ctx, padded, outPtr)
+  }
+
+  /**
+   * HMAC-SHA512 (100% Zero-Alloc)
+   * Escribe el resultado directamente en outPtr.
+   */
+  static hmac_raw(outPtr: usize, kPtr: usize, kLen: isize, mPtr: usize, mLen: isize): void {
+    Sha512.hmac_compute(outPtr, kPtr, kLen, mPtr, mLen)
+  }
+
+  /**
+   * Verifica un HMAC-SHA512 en TIEMPO CONSTANTE (constant-time).
+   * Compara el HMAC calculado con el MAC esperado en macPtr[0..macLen)
+   * (XOR + OR acumulativo, siempre 64 iteraciones, sin early-exit).
+   *
+   * @returns true si el MAC es válido, false en caso contrario.
+   */
+  static hmac_verify_raw(kPtr: usize, kLen: isize, mPtr: usize, mLen: isize, macPtr: usize, macLen: isize): bool {
+    if (macLen !== 64) return false
+
+    const scratchPtr = align8(CRYPTO_WORK_PTR)
+    // Buffer para el HMAC calculado, tras el layout de hmac_compute
+    // (k_buf 128 + b 128 + ctx 208 + padded 256 = 720 bytes). Sin solapamiento.
+    const computed = align8(scratchPtr + 720) // 64 bytes
+
+    Sha512.hmac_compute(computed, kPtr, kLen, mPtr, mLen)
+
+    let diff: u32 = 0
+    for (let i = 0; i < 64; i++) {
+      diff |= load<u8>(computed + i) ^ load<u8>(macPtr + i)
+    }
+    return diff === 0
   }
 }

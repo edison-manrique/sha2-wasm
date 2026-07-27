@@ -294,6 +294,27 @@ export class Sha2Wasm {
     return this.allocator.readBytes(finalOutPtr, Sha2Wasm.SHA256_HASH_LEN)
   }
 
+  /**
+   * Verifica HMAC-SHA256 en tiempo constante. `mac` son los bytes crudos del
+   * MAC esperado (32 bytes). Retorna true si es válido.
+   */
+  sha256HmacVerify(key: Uint8Array | string, data: Uint8Array | string, mac: Uint8Array): boolean {
+    this.allocator.writeInput(key, 0)
+    const keyPtr = this.allocator.lastPtr
+    const keyLen = this.allocator.lastLen
+
+    this.allocator.writeInput(data, keyLen + 16)
+    const dataPtr = this.allocator.lastPtr
+    const dataLen = this.allocator.lastLen
+
+    this.allocator.writeInput(mac, keyLen + 16 + dataLen + 16)
+    const macPtr = this.allocator.lastPtr
+    const macLen = this.allocator.lastLen
+
+    this.setArgLen(6)
+    return this.exp.sha256_hmac_verify_raw(keyPtr, keyLen, dataPtr, dataLen, macPtr, macLen) !== 0
+  }
+
   /** Inicializa contexto SHA-256 en ptr. Llamada directa, sin branching. */
   createSha256Ctx(ctxPtr: number): void {
     this.setArgLen(1)
@@ -461,6 +482,24 @@ export class Sha2Wasm {
     this.exp.sha512_final_raw(ctxPtr, paddedPtr, finalOutPtr)
 
     return this.allocator.readBytes(finalOutPtr, Sha2Wasm.SHA512_HASH_LEN)
+  }
+
+  /** Verifica HMAC-SHA512 en tiempo constante. `mac` son 64 bytes crudos. */
+  sha512HmacVerify(key: Uint8Array | string, data: Uint8Array | string, mac: Uint8Array): boolean {
+    this.allocator.writeInput(key, 0)
+    const keyPtr = this.allocator.lastPtr
+    const keyLen = this.allocator.lastLen
+
+    this.allocator.writeInput(data, keyLen + 16)
+    const dataPtr = this.allocator.lastPtr
+    const dataLen = this.allocator.lastLen
+
+    this.allocator.writeInput(mac, keyLen + 16 + dataLen + 16)
+    const macPtr = this.allocator.lastPtr
+    const macLen = this.allocator.lastLen
+
+    this.setArgLen(6)
+    return this.exp.sha512_hmac_verify_raw(keyPtr, keyLen, dataPtr, dataLen, macPtr, macLen) !== 0
   }
 
   createSha512Ctx(ctxPtr: number): void {

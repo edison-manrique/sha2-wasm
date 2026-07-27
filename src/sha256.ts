@@ -16,7 +16,7 @@
  * - hashFile() con archivo vacío → hash estándar de input vacío (fail-fast).
  */
 
-import { OutputFormat, bytesToHex } from "./types.js"
+import { OutputFormat, bytesToHex, hexToBytes } from "./types.js"
 import { Sha2Wasm } from "./sha2-wasm.js"
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -167,6 +167,23 @@ export class Sha256 {
     const bytes = wasm.sha256Hmac(key, data)
     if (format === "bytes") return bytes
     return bytesToHex(bytes)
+  }
+  /**
+   * Verifica un HMAC-SHA256 en tiempo constante.
+   * @param key  Clave secreta (string UTF-8 o Uint8Array).
+   * @param data Mensaje autenticado (string UTF-8 o Uint8Array).
+   * @param mac  MAC esperado: Uint8Array (32 bytes) o string hexadecimal.
+   * @returns true si el MAC es válido.
+   */
+  static hmacVerify(
+    key: Uint8Array | string,
+    data: Uint8Array | string,
+    mac: Uint8Array | string,
+    wasmInstance?: Sha2Wasm
+  ): boolean {
+    const wasm = wasmInstance || Sha2Wasm.getInstance()
+    const macBytes = typeof mac === "string" ? hexToBytes(mac) : mac
+    return wasm.sha256HmacVerify(key, data, macBytes)
   }
 
   /**

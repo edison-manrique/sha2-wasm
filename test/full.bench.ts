@@ -3,34 +3,43 @@
  * SHA2-WASM – Benchmark reproducible (Bun) + comparativa vs hash-wasm
  *
  * Corre con:
- *   bun run bench.ts                       # correctitud + compute (sha2-wasm vs hash-wasm)
+ *   bun run bench.ts                       # correctitud + compute + HMAC + verify
  *   bun run bench.ts <ruta-archivo>        # + I/O puro + hashFile (el caso real)
  *   bun run bench.ts <ruta-archivo> <ruta-wasm>
  *
- * Qué mide (todo con mediana de N muestras, bloques de 500 MB):
- *   1. CORRECTITUD   → sha2-wasm Y hash-wasm de "abc"/"" vs node:crypto (oráculo).
- *   2. COMPUTE PURO  → 500 MB en RAM, sin disco. Para sha2-wasm y hash-wasm.
- *   3. COMPARATIVA   → ratio sha2-wasm / hash-wasm (>1 = sha2-wasm gana).
- *   4. I/O PURO      → lee el archivo en chunks de 64 MB SIN hashear.
- *   5. HASHFILE      → Sha256/Sha512.hashFile(Bun.file(path)) con double-buffer.
+ * Qué mide (todo con mediana de N muestras):
+ *   1. CORRECTITUD     → hash y HMAC de sha2-wasm Y hash-wasm vs node:crypto (oráculo),
+ *                        incluyendo HMAC verify (bytes, hex y detección de alteración).
+ *   2. COMPUTE PURO    → 500 MB en RAM, sin disco (sha2-wasm vs hash-wasm).
+ *   3. COMPARATIVA     → ratio sha2-wasm / hash-wasm (>1 = sha2-wasm gana).
+ *   4. HMAC THROUGHPUT → HMAC-SHA256/512 one-shot sobre 256 MB (MB/s).
+ *   5. HMAC VERIFY     → hmacVerify constant-time sobre payload de 1 KB (ops/s).
+ *   6. I/O PURO        → lee el archivo en chunks de 64 MB SIN hashear.
+ *   7. HASHFILE        → Sha256/Sha512.hashFile(Bun.file(path)) con streaming real.
  *
  * NOTA: MB = 1024*1024 (binario).
  */
 
-import { createHash } from "node:crypto"
+import { createHash, createHmac } from "node:crypto"
 import path from "node:path"
 import { createSHA256, createSHA512, sha256 as hwSha256, sha512 as hwSha512 } from "hash-wasm"
-import { Sha2Wasm, Sha256, Sha512 } from "../src/index"
+import { Sha2Wasm, Sha256, Sha512, hexToBytes } from "../src/index"
 
 // ── CONSTANTES ──
 const MB = 1024 * 1024
 const CHUNK = 64 * MB
 const COMPUTE_BUF_MB = 500 // bloque de 500 MB por muestra
 const COMPUTE_ITERS = 1 // 1 × 500 MB = 500 MB por muestra
-const COMPUTE_SAMPLES = 7 // 7 muestras → mediana robusta (cada una ya es grande)
+const COMPUTE_SAMPLES = 5
 const HASHFILE_SAMPLES = 5
-const IO_SAMPLES = 3
-const WARMUP = 2 // 2 × 500 MB = 1 GB de warmup (JIT + caché de página)
+const IO_SAMPLES = 2
+const WARMUP = 2
+
+// HMAC
+const HMAC_BUF_MB = 256 // buffer para el throughput de HMAC
+const HMAC_VERIFY_PAYLOAD = 1024 // payload pequeño para verify (debe caber en PARAM_IN)
+const HMAC_SAMPLES = 5
+const HMAC_OPS_ITERS = 50000 // iteraciones por muestra en el bench de verify
 
 // ── HELPERS DE ESTADÍSTICA ──
 
@@ -46,6 +55,12 @@ function report(label: string, samples: number[]): void {
   console.log(`  ${label.padEnd(22)} mediana ${med.toFixed(1).padStart(8)} MB/s   [${list}]`)
 }
 
+function reportOps(label: string, samples: number[]): void {
+  const med = median(samples)
+  const list = samples.map((x) => x.toFixed(0)).join(", ")
+  console.log(`  ${label.padEnd(22)} mediana ${med.toFixed(0).padStart(12)} ops/s   [${list}]`)
+}
+
 // ── CARGA DEL WASM ──
 
 async function loadWasm(p: string): Promise<Sha2Wasm> {
@@ -55,7 +70,7 @@ async function loadWasm(p: string): Promise<Sha2Wasm> {
 
 // ── 1. CORRECTITUD ──
 
-/** Valida sha2-wasm contra node:crypto. Aborta si falla. */
+/** Valida el hash de sha2-wasm contra node:crypto. Aborta si falla. */
 function verifyCorrectness(): void {
   const oracle = (algo: "sha256" | "sha512", input: string): string => createHash(algo).update(input).digest("hex")
 
@@ -98,9 +113,50 @@ async function verifyHashWasm(): Promise<void> {
   if (!ok) throw new Error("CORRECTITUD hash-wasm FALLÓ. Comparación inválida.")
 }
 
+/**
+ * Valida HMAC (cálculo) y HMAC verify (constant-time) contra node:crypto.
+ * Cubre: cálculo == oráculo, verify con bytes, verify con hex, y detección
+ * de alteración (tamper) en SHA-256 y SHA-512. Aborta si algo falla.
+ */
+function verifyHmac(): void {
+  const key = "clave-secreta"
+  const msg = "mensaje a autenticar"
+
+  // Oráculo HMAC (node:crypto) en hex
+  const oracle256 = createHmac("sha256", key).update(msg).digest("hex")
+  const oracle512 = createHmac("sha512", key).update(msg).digest("hex")
+
+  // Cálculo con sha2-wasm (hex)
+  const mac256 = Sha256.hmac(key, msg, "hex")
+  const mac512 = Sha512.hmac(key, msg, "hex")
+
+  // MAC alterados (tamper) → verify debe dar false
+  const t256 = hexToBytes(mac256)
+  t256[0] ^= 0xff
+  const t512 = hexToBytes(mac512)
+  t512[0] ^= 0xff
+
+  const checks: Array<[string, boolean]> = [
+    ["HMAC-SHA256 cálculo == node:crypto", mac256 === oracle256],
+    ["HMAC-SHA512 cálculo == node:crypto", mac512 === oracle512],
+    ["HMAC-SHA256 verify (bytes)", Sha256.hmacVerify(key, msg, hexToBytes(mac256)) === true],
+    ["HMAC-SHA256 verify (hex)", Sha256.hmacVerify(key, msg, mac256) === true],
+    ["HMAC-SHA512 verify (bytes)", Sha512.hmacVerify(key, msg, hexToBytes(mac512)) === true],
+    ["HMAC-SHA512 verify (hex)", Sha512.hmacVerify(key, msg, mac512) === true],
+    ["HMAC-SHA256 tamper detectado", Sha256.hmacVerify(key, msg, t256) === false],
+    ["HMAC-SHA512 tamper detectado", Sha512.hmacVerify(key, msg, t512) === false]
+  ]
+
+  let ok = true
+  for (const [name, pass] of checks) {
+    ok = ok && pass
+    console.log(`  ${pass ? "✅" : "❌"} ${name}`)
+  }
+  if (!ok) throw new Error("HMAC / HMAC-verify FALLÓ. No se mide.")
+}
+
 // ── 2. COMPUTE PURO (runner común para ambas libs) ──
 
-/** Interfaz mínima que cumplen tanto nuestro hasher como el adapter de hash-wasm. */
 type HasherLike = {
   reset(): void
   update(d: Uint8Array): void
@@ -109,7 +165,6 @@ type HasherLike = {
 
 function benchComputeOne(name: string, mk: () => HasherLike, buf: Uint8Array): number[] {
   const h = mk()
-  // warmup: sube el hot-loop a DFG/FTL (JSC) y llena caché de página
   for (let w = 0; w < WARMUP; w++) {
     h.reset()
     h.update(buf)
@@ -119,9 +174,9 @@ function benchComputeOne(name: string, mk: () => HasherLike, buf: Uint8Array): n
   for (let r = 0; r < COMPUTE_SAMPLES; r++) {
     h.reset()
     const t0 = performance.now()
-    for (let i = 0; i < COMPUTE_ITERS; i++) h.update(buf) // 500 MB por muestra
+    for (let i = 0; i < COMPUTE_ITERS; i++) h.update(buf)
     const t1 = performance.now()
-    h.digest("bytes") // fuera del timing
+    h.digest("bytes")
     samples.push((COMPUTE_ITERS * COMPUTE_BUF_MB) / ((t1 - t0) / 1000))
   }
   report(name, samples)
@@ -132,15 +187,13 @@ async function benchCompute(
   wasm: Sha2Wasm
 ): Promise<{ ours: { sha256: number; sha512: number }; hw: { sha256: number; sha512: number } }> {
   const buf = new Uint8Array(COMPUTE_BUF_MB * MB)
-  buf.fill(0x5a) // datos no comprimibles
+  buf.fill(0x5a)
 
   console.log(`COMPUTE PURO (RAM, ${COMPUTE_BUF_MB} MB/muestra, ${COMPUTE_SAMPLES} muestras, sin I/O):`)
 
-  // ── sha2-wasm (nuestro) ──
   const ours256 = benchComputeOne("SHA-256 sha2-wasm", () => Sha256.createHasher(wasm), buf)
   const ours512 = benchComputeOne("SHA-512 sha2-wasm", () => Sha512.createHasher(wasm), buf)
 
-  // ── hash-wasm (adapter a HasherLike; init() ≡ reset()) ──
   const hw256 = await createSHA256()
   const hw512 = await createSHA512()
   const adapter256: HasherLike = {
@@ -159,7 +212,6 @@ async function benchCompute(
   const ours = { sha256: median(ours256), sha512: median(ours512) }
   const hw = { sha256: median(hwS256), sha512: median(hwS512) }
 
-  // ── 3. COMPARATIVA ──
   console.log("─".repeat(72))
   console.log(" COMPARATIVA COMPUTE (mediana, MB/s)  ·  ratio = sha2-wasm / hash-wasm")
   console.log("─".repeat(72))
@@ -180,7 +232,75 @@ async function benchCompute(
   return { ours, hw }
 }
 
-// ── 4. I/O PURO ──
+// ── 4. HMAC THROUGHPUT (MB/s) ──
+
+/**
+ * Mide el throughput de HMAC one-shot sobre un buffer grande (MB/s).
+ * Usa el formato "bytes" para evitar el overhead de la conversión a hex.
+ * (HMAC de datos grandes va por el slow-path interno: ipad/opad + streaming.)
+ */
+function benchHmac(): { sha256: number; sha512: number } {
+  const key = new TextEncoder().encode("benchmark-hmac-secret-key-32bytes!")
+  const buf = new Uint8Array(HMAC_BUF_MB * MB)
+  buf.fill(0xa5)
+
+  const run = (name: string, fn: () => unknown): number[] => {
+    for (let w = 0; w < WARMUP; w++) fn()
+    const samples: number[] = []
+    for (let r = 0; r < HMAC_SAMPLES; r++) {
+      const t0 = performance.now()
+      fn()
+      const t1 = performance.now()
+      samples.push(HMAC_BUF_MB / ((t1 - t0) / 1000))
+    }
+    report(name, samples)
+    return samples
+  }
+
+  console.log(`HMAC THROUGHPUT (RAM, ${HMAC_BUF_MB} MB/muestra, one-shot "bytes"):`)
+  const s256 = run("HMAC-SHA256", () => Sha256.hmac(key, buf, "bytes"))
+  const s512 = run("HMAC-SHA512", () => Sha512.hmac(key, buf, "bytes"))
+  console.log()
+  return { sha256: median(s256), sha512: median(s512) }
+}
+
+// ── 5. HMAC VERIFY (ops/s, constant-time) ──
+
+/**
+ * Mide el rendimiento de hmacVerify (constant-time) sobre un payload pequeño,
+ * en ops/s. Es el caso real de verificación (tokens/mensajes cortos).
+ * El verify one-shot requiere key+payload+mac en PARAM_IN (≤ ~1 MB).
+ */
+function benchHmacVerify(): { sha256: number; sha512: number } {
+  const key = new TextEncoder().encode("benchmark-hmac-secret-key-32bytes!")
+  const payload = new Uint8Array(HMAC_VERIFY_PAYLOAD)
+  payload.fill(0x3c)
+
+  // MAC válidos precalculados (la lib ya está validada vs node:crypto en verifyHmac)
+  const mac256 = Sha256.hmac(key, payload, "bytes") as Uint8Array
+  const mac512 = Sha512.hmac(key, payload, "bytes") as Uint8Array
+
+  const run = (name: string, fn: () => boolean): number[] => {
+    for (let w = 0; w < WARMUP; w++) fn()
+    const samples: number[] = []
+    for (let r = 0; r < HMAC_SAMPLES; r++) {
+      const t0 = performance.now()
+      for (let i = 0; i < HMAC_OPS_ITERS; i++) fn()
+      const t1 = performance.now()
+      samples.push(HMAC_OPS_ITERS / ((t1 - t0) / 1000))
+    }
+    reportOps(name, samples)
+    return samples
+  }
+
+  console.log(`HMAC VERIFY (constant-time, payload ${HMAC_VERIFY_PAYLOAD} B, ${HMAC_OPS_ITERS} ops/muestra):`)
+  const s256 = run("HMAC-SHA256 verify", () => Sha256.hmacVerify(key, payload, mac256))
+  const s512 = run("HMAC-SHA512 verify", () => Sha512.hmacVerify(key, payload, mac512))
+  console.log()
+  return { sha256: median(s256), sha512: median(s512) }
+}
+
+// ── 6. I/O PURO ──
 
 async function benchIO(p: string): Promise<number> {
   const file = Bun.file(p)
@@ -215,7 +335,7 @@ async function benchIO(p: string): Promise<number> {
   return median(samples)
 }
 
-// ── 5. HASHFILE REAL ──
+// ── 7. HASHFILE REAL ──
 
 async function benchHashFile(
   p: string,
@@ -237,7 +357,7 @@ async function benchHashFile(
     return { med: median(samples), hash }
   }
 
-  console.log(`HASHFILE real (archivo ${(file.size / MB).toFixed(1)} MB, double-buffer):`)
+  console.log(`HASHFILE real (archivo ${(file.size / MB).toFixed(1)} MB, streaming real):`)
   const r256 = await run("SHA-256", (f) => Sha256.hashFile(f, "hex", undefined, wasm))
   const r512 = await run("SHA-512", (f) => Sha512.hashFile(f, "hex", undefined, wasm))
   console.log(`  hash SHA-256: ${r256.hash}`)
@@ -280,7 +400,7 @@ async function main(): Promise<void> {
   console.log(" SHA2-WASM BENCHMARK  ·  Bun / JavaScriptCore  ·  vs hash-wasm")
   console.log("═".repeat(72))
   console.log(`  wasm  : ${wasmPath}`)
-  console.log(`  file  : ${filePath ?? "(ninguno → solo compute)"}`)
+  console.log(`  file  : ${filePath ?? "(ninguno → solo compute/HMAC)"}`)
   console.log(`  unidad: MB = 1024*1024 (binario)\n`)
 
   if (!Bun.file(wasmPath).size) {
@@ -290,16 +410,32 @@ async function main(): Promise<void> {
   const wasm = await loadWasm(wasmPath)
   console.log("WASM cargado.\n")
 
+  // 1. Correctitud (hash + hash-wasm + HMAC + HMAC-verify)
   console.log("─".repeat(72))
   console.log("CORRECTITUD (sha2-wasm + hash-wasm vs node:crypto)")
   console.log("─".repeat(72))
   verifyCorrectness()
   await verifyHashWasm()
-  console.log("  ✅ Ambas librerías verificadas.\n")
+  verifyHmac()
+  console.log("  ✅ Hash, HMAC y HMAC-verify verificados.\n")
 
+  // 2-3. Compute puro + comparativa
   console.log("─".repeat(72))
   const compute = await benchCompute(wasm)
 
+  // 4. HMAC throughput
+  console.log("─".repeat(72))
+  const hmac = benchHmac()
+  console.log(`  Resumen HMAC:  SHA-256 ${hmac.sha256.toFixed(1)} MB/s  ·  SHA-512 ${hmac.sha512.toFixed(1)} MB/s\n`)
+
+  // 5. HMAC verify
+  console.log("─".repeat(72))
+  const verify = benchHmacVerify()
+  console.log(
+    `  Resumen verify: SHA-256 ${verify.sha256.toFixed(0)} ops/s  ·  SHA-512 ${verify.sha512.toFixed(0)} ops/s\n`
+  )
+
+  // 6-7. I/O + hashFile (solo si hay archivo)
   let io: number | null = null
   let hf: { sha256: number; sha512: number } | null = null
   if (filePath) {
@@ -313,6 +449,7 @@ async function main(): Promise<void> {
     hf = await benchHashFile(filePath, wasm)
   }
 
+  // Diagnóstico
   console.log("═".repeat(72))
   console.log(" DIAGNÓSTICO  (hashFile vs piso físico = min(compute, I/O))")
   console.log("═".repeat(72))

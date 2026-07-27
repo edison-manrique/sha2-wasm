@@ -332,10 +332,11 @@ export class Sha256 {
   }
 
   /**
-   * HMAC-SHA256 (100% Zero-Alloc)
-   * Escribe el resultado directamente en outPtr.
+   * Calcula el HMAC-SHA256 de kPtr[0..kLen) sobre mPtr[0..mLen) y escribe los
+   * 32 bytes resultantes en outPtr. Helper interno compartido por hmac_raw y
+   * hmac_verify_raw (100% Zero-Alloc). Comportamiento idéntico al hmac_raw original.
    */
-  static hmac_raw(outPtr: usize, kPtr: usize, kLen: isize, mPtr: usize, mLen: isize): void {
+  private static hmac_compute(outPtr: usize, kPtr: usize, kLen: isize, mPtr: usize, mLen: isize): void {
     const scratchPtr = align8(CRYPTO_WORK_PTR)
     const k_buf = scratchPtr // 64 bytes
     const b = align8(k_buf + 64) // 64 bytes
@@ -354,7 +355,6 @@ export class Sha256 {
     for (let i = 0; i < 64; i++) {
       store<u8>(b + i, load<u8>(k_buf + i) ^ 0x36)
     }
-
     ctx.init()
     Sha256.update(ctx, b, 64)
     Sha256.update(ctx, mPtr, mLen)
@@ -364,10 +364,43 @@ export class Sha256 {
     for (let i = 0; i < 64; i++) {
       store<u8>(b + i, load<u8>(k_buf + i) ^ 0x5c)
     }
-
     ctx.init()
     Sha256.update(ctx, b, 64)
     Sha256.update(ctx, outPtr, 32)
     Sha256.final(ctx, padded, outPtr)
+  }
+
+  /**
+   * HMAC-SHA256 (100% Zero-Alloc). Escribe el resultado en outPtr.
+   */
+  static hmac_raw(outPtr: usize, kPtr: usize, kLen: isize, mPtr: usize, mLen: isize): void {
+    Sha256.hmac_compute(outPtr, kPtr, kLen, mPtr, mLen)
+  }
+
+  /**
+   * Verifica un HMAC-SHA256 en TIEMPO CONSTANTE (constant-time).
+   * Calcula el HMAC de kPtr[0..kLen) sobre mPtr[0..mLen) y lo compara con el
+   * MAC esperado en macPtr[0..macLen) sin revelar información por timing
+   * (XOR + OR acumulativo, siempre 32 iteraciones, sin early-exit).
+   *
+   * @returns true si el MAC es válido, false en caso contrario.
+   */
+  static hmac_verify_raw(kPtr: usize, kLen: isize, mPtr: usize, mLen: isize, macPtr: usize, macLen: isize): bool {
+    // La longitud del MAC es pública (32 bytes para SHA-256); si no coincide, inválido.
+    if (macLen !== 32) return false
+
+    const scratchPtr = align8(CRYPTO_WORK_PTR)
+    // Buffer para el HMAC calculado, tras el layout de hmac_compute
+    // (k_buf 64 + b 64 + ctx 112 + padded 128 = 368 bytes). Sin solapamiento.
+    const computed = align8(scratchPtr + 368) // 32 bytes
+
+    Sha256.hmac_compute(computed, kPtr, kLen, mPtr, mLen)
+
+    // Comparación constant-time: longitud fija, sin branches dependientes de datos.
+    let diff: u32 = 0
+    for (let i = 0; i < 32; i++) {
+      diff |= load<u8>(computed + i) ^ load<u8>(macPtr + i)
+    }
+    return diff === 0
   }
 }

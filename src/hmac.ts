@@ -8,6 +8,8 @@
 
 import { HashAlgorithm, OutputFormat, bytesToHex } from "./types.js"
 import { Sha2Wasm } from "./sha2-wasm.js"
+import { Sha512 } from "./sha512.js"
+import { Sha256 } from "./sha256.js"
 
 export class HMAC {
   public readonly key: Uint8Array | string
@@ -59,5 +61,15 @@ export class HMAC {
       return HMAC.compute(this.algorithm, this.key, data, "bytes")
     }
     return HMAC.compute(this.algorithm, this.key, data, "hex")
+  }
+
+  /**
+   * Verifica el HMAC de un mensaje contra un MAC esperado, en tiempo constante.
+   * @param data Mensaje autenticado.
+   * @param mac  MAC esperado (Uint8Array o string hex).
+   * @returns true si el MAC es válido.
+   */
+  verify(data: Uint8Array | string, mac: Uint8Array | string): boolean {
+    return this.algorithm === "SHA512" ? Sha512.hmacVerify(this.key, data, mac) : Sha256.hmacVerify(this.key, data, mac)
   }
 }
