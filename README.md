@@ -78,7 +78,7 @@ const fromBytes = Sha256.hash(new Uint8Array([0x68, 0x6f, 0x6c, 0x61]))
 Misma API que SHA-256, pero produce un digest de **64 bytes** (128 caracteres hex).
 
 ```ts
-import { Sha512 } from "sha2-wasm"
+import { Sha512 } from "@edison-manrique/sha2-wasm"
 
 const hash512 = Sha512.hash("Mensaje importante")
 // → string hexadecimal de 128 caracteres
@@ -91,7 +91,7 @@ const bytes512 = Sha512.hash("Mensaje importante", "bytes") // Uint8Array(64)
 Autentica un mensaje con una clave secreta conforme a **RFC 2104**.
 
 ```ts
-import { Sha256, Sha512, HMAC } from "sha2-wasm"
+import { Sha256, Sha512, HMAC } from "@edison-manrique/sha2-wasm"
 
 const clave = "mi-clave-secreta-super-segura"
 const mensaje = "Mensaje confidencial para firmar"
@@ -116,7 +116,7 @@ const mac2 = HMAC.compute("SHA512", clave, mensaje, "bytes") // Uint8Array(64)
 Para datos que llegan en fragmentos (chunks de red, trozos de archivo, streams). Procesa el hash **sin acumular todo en memoria**.
 
 ```ts
-import { Sha256 } from "sha2-wasm"
+import { Sha256 } from "@edison-manrique/sha2-wasm"
 
 // 🔄 Crea un hasher incremental
 const hasher = Sha256.createHasher()
@@ -144,7 +144,7 @@ const otro = hasher.digestHex()
 Hashea un `Blob` / `File` de **cualquier tamaño** con streaming real y memoria plana.
 
 ```ts
-import { Sha256 } from "sha2-wasm"
+import { Sha256 } from "@edison-manrique/sha2-wasm"
 
 // 📁 Selecciona un archivo (input type="file")
 const file = document.querySelector<HTMLInputElement>("input[type=file]")!.files![0]
@@ -175,7 +175,7 @@ Sha256.hash(data, "bytes") // → Uint8Array
 Utilidades de conversión incluidas:
 
 ```ts
-import { bytesToHex, hexToBytes, toUint8Array } from "sha2-wasm"
+import { bytesToHex, hexToBytes, toUint8Array } from "@edison-manrique/sha2-wasm"
 
 const hex = bytesToHex(new Uint8Array([0xde, 0xad, 0xbe, 0xef])) // "deadbeef"
 const bytes = hexToBytes("deadbeef") // Uint8Array(4)
