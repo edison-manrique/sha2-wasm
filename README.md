@@ -57,7 +57,7 @@ await Sha2Wasm.load()
 Ideal para hashear datos completos de una sola vez. Devuelve un digest de **32 bytes**.
 
 ```ts
-import { Sha256 } from "sha2-wasm"
+import { Sha256 } from "@edison-manrique/sha2-wasm"
 
 const texto = "Hola Mundo desde sha2-wasm 👋"
 
