@@ -12,7 +12,7 @@
     "release": {
       "outFile": "dist/sha2.wasm",
       "optimizeLevel": 3,
-      "shrinkLevel": 3,
+      "shrinkLevel": 2,
       "converge": true,
       "noAssert": true,
       "initialMemory": 32,

@@ -1,6 +1,6 @@
 {
   "name": "@edison-manrique/sha2-wasm",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Implementación de alto rendimiento de SHA-2 (SHA-256 / SHA-512 / HMAC) en AssemblyScript / WebAssembly con un envoltorio modular en TypeScript sin asignación de memoria (zero-allocation).",
   "author": "Edison Manrique",
   "license": "Apache-2.0",
@@ -19,10 +19,10 @@
     "LICENSE"
   ],
   "scripts": {
-    "asbuild": "asc assembly/index.ts --target release",
-    "asbuild:debug": "asc assembly/index.ts --target debug",
+    "build:as": "asc assembly/index.ts --target release",
+    "build:as:debug": "asc assembly/index.ts --target debug",
     "build:ts": "esbuild src/index.ts --bundle --format=esm --minify --platform=browser --outfile=dist/index.js && tsc --emitDeclarationOnly",
-    "build": "bun run asbuild && bun run build:ts",
+    "build": "bun run build:as && bun run build:ts",
     "prepublishOnly": "bun run build",
     "test": "bun test test/index.test.ts",
     "test:stress": "bun test test/stress.test.ts",
