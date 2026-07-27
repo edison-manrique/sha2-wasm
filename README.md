@@ -190,8 +190,8 @@ Pruebas ejecutadas en Bun (JavaScriptCore) sobre un procesador x86-64 moderno, e
 
 | Algoritmo | Caso                   | Throughput    | Ops/seg           |
 | --------- | ---------------------- | ------------- | ----------------- |
-| SHA-256   | Archivo (streaming)    | **~212 MB/s** | —                 |
-| SHA-512   | Archivo (streaming)    | **~257 MB/s** | —                 |
+| SHA-256   | Archivo (streaming)    | **~200 MB/s** | —                 |
+| SHA-512   | Archivo (streaming)    | **~300 MB/s** | —                 |
 | SHA-256   | Hashes pequeños (55 B) | ~114 MB/s     | **~2.20 M ops/s** |
 | SHA-512   | Hashes pequeños (55 B) | ~95 MB/s      | **~1.85 M ops/s** |
 | SHA-256   | Compute puro (RAM)     | **~212 MB/s** | —                 |
@@ -204,7 +204,7 @@ Pruebas ejecutadas en Bun (JavaScriptCore) sobre un procesador x86-64 moderno, e
 | [`hash-wasm`](https://www.npmjs.com/package/hash-wasm) | **+5 %** más rápido  |
 | C nativo (`gcc -O3 -march=native`)                     | **~68 %** del nativo |
 
-> El ~68 % frente a C nativo es la banda alta esperada para WebAssembly (sin acceso a instrucciones específicas de CPU como `-march=native`). A cambio obtienes **portabilidad total**: el mismo binario de 14 KB corre en cualquier navegador, Bun o Node.
+> El ~68 % frente a C nativo es la banda alta esperada para WebAssembly (sin acceso a instrucciones específicas de CPU como `-march=native`). A cambio obtienes **portabilidad total**: el mismo binario de 12 KB corre en cualquier navegador, Bun o Node.
 
 ---
 
