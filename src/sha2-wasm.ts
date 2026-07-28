@@ -557,4 +557,46 @@ export class Sha2Wasm {
     this.exp.sha512_final_raw(ctxPtr, paddedPtr, outPtr)
     return this.allocator.readBytes(outPtr, Sha2Wasm.SHA512_HASH_LEN)
   }
+
+  /** PBKDF2-HMAC-SHA256. `dkLen` ≤ 8192 (tamaño de PARAM_OUT). */
+  sha256Pbkdf2(
+    password: Uint8Array | string,
+    salt: Uint8Array | string,
+    iterations: number,
+    dkLen: number
+  ): Uint8Array {
+    if (dkLen <= 0 || dkLen > 8192) throw new RangeError("dkLen debe estar entre 1 y 8192 bytes")
+    this.allocator.writeInput(password, 0)
+    const passwordPtr = this.allocator.lastPtr
+    const passwordLen = this.allocator.lastLen
+
+    this.allocator.writeInput(salt, passwordLen + 16)
+    const saltPtr = this.allocator.lastPtr
+    const saltLen = this.allocator.lastLen
+
+    this.setArgLen(7)
+    this.exp.sha256_pbkdf2_raw(this.allocator.outPtr, passwordPtr, passwordLen, saltPtr, saltLen, iterations, dkLen)
+    return this.allocator.readBytes(this.allocator.outPtr, dkLen)
+  }
+
+  /** PBKDF2-HMAC-SHA512. `dkLen` ≤ 8192. */
+  sha512Pbkdf2(
+    password: Uint8Array | string,
+    salt: Uint8Array | string,
+    iterations: number,
+    dkLen: number
+  ): Uint8Array {
+    if (dkLen <= 0 || dkLen > 8192) throw new RangeError("dkLen debe estar entre 1 y 8192 bytes")
+    this.allocator.writeInput(password, 0)
+    const passwordPtr = this.allocator.lastPtr
+    const passwordLen = this.allocator.lastLen
+
+    this.allocator.writeInput(salt, passwordLen + 16)
+    const saltPtr = this.allocator.lastPtr
+    const saltLen = this.allocator.lastLen
+
+    this.setArgLen(7)
+    this.exp.sha512_pbkdf2_raw(this.allocator.outPtr, passwordPtr, passwordLen, saltPtr, saltLen, iterations, dkLen)
+    return this.allocator.readBytes(this.allocator.outPtr, dkLen)
+  }
 }

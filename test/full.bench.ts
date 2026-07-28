@@ -20,8 +20,8 @@
  * NOTA: MB = 1024*1024 (binario).
  */
 
-import { createHash, createHmac } from "node:crypto"
 import path from "node:path"
+import { createHash, createHmac, pbkdf2Sync } from "node:crypto"
 import { createSHA256, createSHA512, sha256 as hwSha256, sha512 as hwSha512 } from "hash-wasm"
 import { Sha2Wasm, Sha256, Sha512, hexToBytes } from "../src/index"
 
@@ -40,6 +40,48 @@ const HMAC_BUF_MB = 256 // buffer para el throughput de HMAC
 const HMAC_VERIFY_PAYLOAD = 1024 // payload pequeño para verify (debe caber en PARAM_IN)
 const HMAC_SAMPLES = 5
 const HMAC_OPS_ITERS = 50000 // iteraciones por muestra en el bench de verify
+
+function verifyPbkdf2(): void {
+  const password = "password"
+  const salt = "salt"
+  const iterations = 2048
+
+  // Oráculo node:crypto
+  const oracle256 = pbkdf2Sync(password, salt, iterations, 32, "sha256").toString("hex")
+  const oracle512 = pbkdf2Sync(password, salt, iterations, 64, "sha512").toString("hex")
+
+  const got256 = Sha256.pbkdf2(password, salt, iterations, 32)
+  const got512 = Sha512.pbkdf2(password, salt, iterations, 64)
+
+  const ok256 = got256 === oracle256
+  const ok512 = got512 === oracle512
+  console.log(`  ${ok256 ? "✅" : "❌"} PBKDF2-HMAC-SHA256 (2048 it, dkLen 32) == node:crypto`)
+  console.log(`  ${ok512 ? "✅" : "❌"} PBKDF2-HMAC-SHA512 (2048 it, dkLen 64) == node:crypto`)
+  if (!(ok256 && ok512)) throw new Error("PBKDF2 FALLÓ")
+}
+
+function benchPbkdf2(): void {
+  const password = "password"
+  const salt = "salt"
+  const iters = 2048
+  const ITERS_BENCH = 200 // derivaciones por muestra
+
+  const run = (name: string, fn: () => unknown): void => {
+    for (let w = 0; w < 2; w++) fn()
+    const samples: number[] = []
+    for (let r = 0; r < 5; r++) {
+      const t0 = performance.now()
+      for (let i = 0; i < ITERS_BENCH; i++) fn()
+      samples.push(ITERS_BENCH / ((performance.now() - t0) / 1000))
+    }
+    const med = median(samples)
+    console.log(`  ${name.padEnd(28)} mediana ${med.toFixed(0).padStart(8)} deriv/s`)
+  }
+
+  console.log(`PBKDF2 (2048 iter, dkLen 64/32):`)
+  run("PBKDF2-HMAC-SHA256", () => Sha256.pbkdf2(password, salt, iters, 32, "bytes"))
+  run("PBKDF2-HMAC-SHA512", () => Sha512.pbkdf2(password, salt, iters, 64, "bytes"))
+}
 
 // ── HELPERS DE ESTADÍSTICA ──
 
@@ -409,6 +451,9 @@ async function main(): Promise<void> {
   }
   const wasm = await loadWasm(wasmPath)
   console.log("WASM cargado.\n")
+
+  verifyPbkdf2()
+  benchPbkdf2()
 
   // 1. Correctitud (hash + hash-wasm + HMAC + HMAC-verify)
   console.log("─".repeat(72))

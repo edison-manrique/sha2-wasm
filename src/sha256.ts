@@ -264,4 +264,39 @@ export class Sha256 {
   static createHasher(wasmInstance?: Sha2Wasm): Sha256Hasher {
     return new Sha256Hasher(wasmInstance)
   }
+
+  /**
+   * Deriva una clave con PBKDF2-HMAC-SHA256 (RFC 8018).
+   * @param password   Contraseña (string UTF-8 o Uint8Array).
+   * @param salt       Salt (string UTF-8 o Uint8Array).
+   * @param iterations Número de iteraciones (ej. 2048 para BIP39, 4096 para WPA2).
+   * @param dkLen      Longitud de la clave derivada en bytes (ej. 32 o 64).
+   * @param format     "hex" (por defecto) o "bytes".
+   */
+  static pbkdf2(
+    password: Uint8Array | string,
+    salt: Uint8Array | string,
+    iterations: number,
+    dkLen: number,
+    format?: "hex"
+  ): string
+  static pbkdf2(
+    password: Uint8Array | string,
+    salt: Uint8Array | string,
+    iterations: number,
+    dkLen: number,
+    format: "bytes"
+  ): Uint8Array
+  static pbkdf2(
+    password: Uint8Array | string,
+    salt: Uint8Array | string,
+    iterations: number,
+    dkLen: number,
+    format: OutputFormat = "hex",
+    wasmInstance?: Sha2Wasm
+  ): Uint8Array | string {
+    const wasm = wasmInstance || Sha2Wasm.getInstance()
+    const bytes = wasm.sha256Pbkdf2(password, salt, iterations, dkLen)
+    return format === "bytes" ? bytes : bytesToHex(bytes)
+  }
 }

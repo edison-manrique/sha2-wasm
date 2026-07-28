@@ -15,6 +15,7 @@
 import { SCRATCH_PTR, PARAM_IN_PTR, PARAM_OUT_PTR, CRYPTO_WORK_PTR } from "./memory"
 import { Sha256, Sha256Context } from "./sha256"
 import { Sha512, Sha512Context } from "./sha512"
+import { Pbkdf2 } from "./pbkdf2"
 
 // ── Exportar punteros del scratchpad estático ──────────────────────────────
 export { SCRATCH_PTR, PARAM_IN_PTR, PARAM_OUT_PTR, CRYPTO_WORK_PTR }
@@ -197,4 +198,30 @@ export function sha512_update_raw(ctxPtr: usize, mPtr: usize, n: isize): void {
 export function sha512_final_raw(ctxPtr: usize, paddedPtr: usize, outPtr: usize): void {
   const ctx = changetype<Sha512Context>(ctxPtr)
   Sha512.final(ctx, paddedPtr, outPtr)
+}
+
+/** PBKDF2-HMAC-SHA256 (RFC 8018). Escribe dkLen bytes en outPtr. */
+export function sha256_pbkdf2_raw(
+  outPtr: usize,
+  passwordPtr: usize,
+  passwordLen: i32,
+  saltPtr: usize,
+  saltLen: i32,
+  iterations: i32,
+  dkLen: i32
+): void {
+  Pbkdf2.sha256_raw(outPtr, passwordPtr, passwordLen, saltPtr, saltLen, iterations, dkLen)
+}
+
+/** PBKDF2-HMAC-SHA512 (RFC 8018). Escribe dkLen bytes en outPtr. */
+export function sha512_pbkdf2_raw(
+  outPtr: usize,
+  passwordPtr: usize,
+  passwordLen: i32,
+  saltPtr: usize,
+  saltLen: i32,
+  iterations: i32,
+  dkLen: i32
+): void {
+  Pbkdf2.sha512_raw(outPtr, passwordPtr, passwordLen, saltPtr, saltLen, iterations, dkLen)
 }

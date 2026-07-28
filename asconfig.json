@@ -13,10 +13,11 @@
       "outFile": "dist/sha2.wasm",
       "optimizeLevel": 3,
       "shrinkLevel": 2,
-      "converge": true,
       "noAssert": true,
+      "converge": true,
+      "convergeMaxIters": 64,
       "initialMemory": 32,
-      "maximumMemory": 32,
+      "maximumMemory": 0,
       "runtime": "stub"
     }
   },

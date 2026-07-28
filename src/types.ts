@@ -92,6 +92,27 @@ export interface AsmExports {
     macLen: number
   ) => number
 
+  /** PBKDF2-HMAC-SHA256 (RFC 8018). Escribe dkLen bytes en outPtr. */
+  sha256_pbkdf2_raw: (
+    outPtr: number,
+    passwordPtr: number,
+    passwordLen: number,
+    saltPtr: number,
+    saltLen: number,
+    iterations: number,
+    dkLen: number
+  ) => void
+  /** PBKDF2-HMAC-SHA512 (RFC 8018). Escribe dkLen bytes en outPtr. */
+  sha512_pbkdf2_raw: (
+    outPtr: number,
+    passwordPtr: number,
+    passwordLen: number,
+    saltPtr: number,
+    saltLen: number,
+    iterations: number,
+    dkLen: number
+  ) => void
+
   // ── ABI ASSEMBLYSCRIPT ──
 
   /** Requerido por AS para funciones con parámetros opcionales. */
