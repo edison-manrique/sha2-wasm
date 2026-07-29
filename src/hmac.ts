@@ -6,10 +6,10 @@
  * eliminando la necesidad de `as any` en el caller.
  */
 
-import { HashAlgorithm, OutputFormat, bytesToHex } from "./types.js"
-import { Sha2Wasm } from "./sha2-wasm.js"
-import { Sha512 } from "./sha512.js"
-import { Sha256 } from "./sha256.js"
+import { HashAlgorithm, OutputFormat, bytesToHex } from "./types"
+import { Sha2Wasm } from "./sha2-wasm"
+import { Sha512 } from "./sha512"
+import { Sha256 } from "./sha256"
 
 export class HMAC {
   public readonly key: Uint8Array | string

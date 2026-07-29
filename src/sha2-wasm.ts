@@ -14,8 +14,8 @@
  * - HMAC fast-path valida capacidad ANTES de escribir.
  */
 
-import { AsmExports, getGlobalValue } from "./types.js"
-import { WasmAllocator } from "./allocator.js"
+import { AsmExports, getGlobalValue } from "./types"
+import { WasmAllocator } from "./allocator"
 
 export class Sha2Wasm {
   private exp: AsmExports

@@ -34,9 +34,9 @@
  * ```
  */
 
-export { Sha2Wasm } from "./sha2-wasm.js"
-export { WasmAllocator } from "./allocator.js"
-export { Sha256, Sha256Hasher } from "./sha256.js"
-export { Sha512, Sha512Hasher } from "./sha512.js"
-export { HMAC } from "./hmac.js"
-export * from "./types.js"
+export { Sha2Wasm } from "./sha2-wasm"
+export { WasmAllocator } from "./allocator"
+export { Sha256, Sha256Hasher } from "./sha256"
+export { Sha512, Sha512Hasher } from "./sha512"
+export { HMAC } from "./hmac"
+export * from "./types"

@@ -16,8 +16,8 @@
  * - hashFile() con archivo vacío → hash estándar de input vacío (fail-fast).
  */
 
-import { OutputFormat, bytesToHex, hexToBytes } from "./types.js"
-import { Sha2Wasm } from "./sha2-wasm.js"
+import { OutputFormat, bytesToHex, hexToBytes } from "./types"
+import { Sha2Wasm } from "./sha2-wasm"
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  HASHER INCREMENTAL SHA-512
