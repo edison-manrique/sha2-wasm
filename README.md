@@ -281,8 +281,8 @@ Pruebas ejecutadas en Bun (JavaScriptCore) sobre un procesador x86-64 moderno, e
 bun run build
 
 # Compilar solo el binario WASM
-bun run build:as         # release → dist/sha2.wasm
-bun run build:as:debug   # debug → build/debug.wasm + .wat + sourcemap
+bun run asbuild          # release → dist/sha2.wasm
+bun run asbuild:debug    # debug → build/debug.wasm + .wat + sourcemap
 
 # Verificación de tipos
 bun run typecheck
